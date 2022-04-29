@@ -142,11 +142,17 @@ local ALT_LANGUAGE_CODES = {}
 ALT_LANGUAGE_CODES["zh-CN"] = "zh"
 ALT_LANGUAGE_CODES["iw"] = "he"
 
+local BING_LANGUAGE_CODES = {
+  zh = "zh-Hans",
+  auto = "auto-detect",
+}
+
 local Translator = {
     trans_servers = {
         "https://translate.googleapis.com/",
         "https://translate.google.cn",
         "https://fanyi.youdao.com",
+        "https://cn.bing.com",
     },
     trans_path = "/translate_a/single",
     trans_params = {
@@ -422,6 +428,56 @@ local function http_request(s_url, method, headers, request)
         response_body = xml
     }
 end
+
+--[[--
+Returns decoded JSON table from translate server.
+
+@string text
+@string target_lang
+@string source_lang
+@treturn string result, or nil
+--]]
+
+
+function Translator:loadPageByBing(text, target_lang, source_lang)
+    local ltn12 = require("ltn12")
+    local headers = {}
+    headers['content-type'] = 'application/x-www-form-urlencoded'
+    target_lang = BING_LANGUAGE_CODES[target_lang] or target_lang
+    source_lang = BING_LANGUAGE_CODES[source_lang] or source_lang
+    local query = string.format(
+        "fromLang=%s&text=%s&to=%s&token=FPAuy-yph7JR1qGFr6sqEeh6MpX67byh&key=1651250329379",
+        source_lang, text, target_lang)
+    logger.dbg("query", query)
+    headers["content-length"] = string.len(query)
+    local request = {
+        source = ltn12.source.string(query)
+    }
+
+    local s_url = "https://cn.bing.com/ttranslatev3?&IG=0200D232FF984A859519C84FB097E8B3&IID=SERP.5511.1"
+    local resp = http_request(s_url, "POST", headers, request)
+    local ok, bing_result = pcall(JSON.decode, resp.response_body, JSON.decode.simple)
+    if ok and bing_result then
+        logger.dbg("translator json:", bing_result)
+    else
+        logger.warn("translator error:", bing_result)
+    end
+    local resultAlternative = {}
+    local translateResult = {}
+    for _, v1 in ipairs(bing_result) do
+        for _, v2 in ipairs(v1.translations) do
+            table.insert(translateResult,
+                { v2.text, text }
+            )
+        end
+    end
+    local resultAsGoogleTranslate = {}
+    resultAsGoogleTranslate[1] = translateResult
+    resultAsGoogleTranslate[6] = resultAlternative
+    logger.dbg("translator json as google translate format:", resultAsGoogleTranslate)
+    return resultAsGoogleTranslate
+end
+TRANS_FUNCS["https://cn.bing.com"] = Translator.loadPageByBing
 
 --[[--
 Returns decoded JSON table from translate server.
