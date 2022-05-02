@@ -441,19 +441,32 @@ Returns decoded JSON table from translate server.
 function Translator:loadPageByBing(text, target_lang, source_lang)
     local ltn12 = require("ltn12")
     local headers = {}
-    headers['content-type'] = 'application/x-www-form-urlencoded'
     target_lang = BING_LANGUAGE_CODES[target_lang] or target_lang
     source_lang = BING_LANGUAGE_CODES[source_lang] or source_lang
+
+    local cn_host_url = 'https://cn.bing.com/Translator'
+    local resp = http_request(cn_host_url, "GET", headers)
+    local ig = resp.response_body:match('IG:[ ]*"*([^"]*)')
+
+    -- <div id="rich_tta" data-iid="SERP.5566">
+    local iid = resp.response_body:match('<div id="rich_tta" data%-iid="([^"]*)')
+
+    local params_RichTranslateHelper = resp.response_body:match('var params_RichTranslateHelper = ([^]]*)')
+
+    local key, token = params_RichTranslateHelper:match('(%d+),"([^"]+)')
     local query = string.format(
-        "fromLang=%s&text=%s&to=%s&token=FPAuy-yph7JR1qGFr6sqEeh6MpX67byh&key=1651250329379",
-        source_lang, text, target_lang)
+        "fromLang=%s&text=%s&to=%s&token=%s&key=%s",
+        source_lang, text, target_lang, token, key)
     logger.dbg("query", query)
     headers["content-length"] = string.len(query)
     local request = {
         source = ltn12.source.string(query)
     }
 
-    local s_url = "https://cn.bing.com/ttranslatev3?&IG=0200D232FF984A859519C84FB097E8B3&IID=SERP.5511.1"
+    local s_url = string.format(
+        "https://cn.bing.com/ttranslatev3?&IG=%s&IID=%s",
+        ig, iid)
+    headers['content-type'] = 'application/x-www-form-urlencoded'
     local resp = http_request(s_url, "POST", headers, request)
     local ok, bing_result = pcall(JSON.decode, resp.response_body, JSON.decode.simple)
     if ok and bing_result then
