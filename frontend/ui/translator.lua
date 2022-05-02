@@ -154,6 +154,7 @@ local Translator = {
         "https://fanyi.youdao.com",
         "https://cn.bing.com",
     },
+    trans_funcs = {},
     trans_path = "/translate_a/single",
     trans_params = {
         client = "gtx", -- (using "t" raises 403 Forbidden)
@@ -184,14 +185,12 @@ local Translator = {
     default_lang = "en",
 }
 
-local TRANS_FUNCS = {}
-
 function Translator:getTransServer()
     return G_reader_settings:readSetting("trans_server") or self.trans_servers[1]
 end
 
 function Translator:getTransFunc(server)
-    return TRANS_FUNCS[server] or Translator.loadPageByGoogle
+    return self.trans_funcs[server] or Translator.loadPageByGoogle
 end
 
 function Translator:getLanguageName(lang, default_string)
@@ -477,7 +476,7 @@ function Translator:loadPageByBing(text, target_lang, source_lang)
     logger.dbg("translator json as google translate format:", resultAsGoogleTranslate)
     return resultAsGoogleTranslate
 end
-TRANS_FUNCS["https://cn.bing.com"] = Translator.loadPageByBing
+Translator.trans_funcs["https://cn.bing.com"] = Translator.loadPageByBing
 
 --[[--
 Returns decoded JSON table from translate server.
@@ -534,7 +533,7 @@ function Translator:loadPageByYoudao(text, target_lang, source_lang)
     logger.dbg("translator json as google translate format:", resultAsGoogleTranslate)
     return resultAsGoogleTranslate
 end
-TRANS_FUNCS["https://fanyi.youdao.com"] = Translator.loadPageByYoudao
+Translator.trans_funcs["https://fanyi.youdao.com"] = Translator.loadPageByYoudao
 
 --[[--
 Returns decoded JSON table from translate server.
